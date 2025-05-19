@@ -1,0 +1,535 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <vector>
+#include <conio.h>
+#include <windows.h>
+#include <cstdlib>
+#include <ctime>
+#include <limits>
+using namespace std;
+
+void setColor(int color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color); }
+void clearScreen() { system("cls"); }
+void printLine(char ch) { for (int i = 0; i < 50; i++) cout << ch; cout << "\n"; }
+void sleep_ms(int milliseconds) { Sleep(milliseconds); }
+void loadingAnimation(string msg, int count) { cout << msg; for (int i = 0; i < count; i++) { cout << "."; sleep_ms(300); } cout << "\n"; }
+int getIntegerInput() { int value; while (!(cin >> value)) { setColor(12); cout << "Invalid input! Please enter an integer: "; setColor(7); cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n'); } return value; }
+float getFloatInput() { float value; while (!(cin >> value)) { setColor(12); cout << "Invalid input! Please enter a valid amount: "; setColor(7); cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n'); } return value; }
+string encryptPassword(string pwd) { for (char &c : pwd) { c += 3; } return pwd; }
+
+// Polymorphism - virtual
+class Operation {
+public:
+    virtual void perform() = 0;
+    virtual ~Operation() {}
+};
+
+class Account {
+protected:
+    string accNumber;
+    string username;
+    string password;
+    string encPassword;
+    float balance;
+public:
+    Account(){
+        balance = 0.0;
+    }
+    virtual ~Account() {}
+    virtual void createAccount() {
+        clearScreen();
+        printLine('=');
+        setColor(14);
+        cout << "\t--- Create New Account ---\n";
+        printLine('=');
+        setColor(7);
+        cout << "Enter username: ";
+        cin >> username;
+        cout << "Enter password: ";
+        char ch;
+        string pwd = "";
+        while ((ch = _getch()) != 13 ) {
+            if (ch == 8 && !pwd.empty()) { pwd.pop_back(); cout << "\b \b"; }
+            else if( ch == 8 && pwd.empty()){}
+            else { pwd.push_back(ch); cout << "*"; }
+        }
+        cout << "\n";
+        password = pwd; // encryption
+        encPassword = encryptPassword(password);
+        srand(static_cast<unsigned>(time(0)));                  // Type Casting 
+        int randomNum = rand() % 900000 + 100000;
+        accNumber = "ACC" + to_string(randomNum);
+        ofstream outFile("accounts.txt", ios::app);
+        if (outFile.is_open()) {
+            outFile << accNumber << " " << username << " " << encPassword << " " << balance << "\n";
+            outFile.close();
+        }
+        setColor(10);
+        cout << "\nAccount created successfully! Your Account Number is: " ;
+        setColor(7);
+        cout<< accNumber << "\n";
+        cout<< "\nMake sure to note the acc no. if you do, press any key to continue...";
+        _getch();
+        //sleep_ms(6000);
+    }
+    virtual bool login() {
+        clearScreen();
+        printLine('=');
+        setColor(14);
+        cout << "\t--- Login ---\n";
+        printLine('=');
+        setColor(7);
+        cout << "Enter account number: ";
+        string inputAcc;
+        cin >> inputAcc;
+        cout << "Enter password: ";
+        char ch;
+        string inputPwd = "";
+        while ((ch = _getch()) != 13) {
+            if (ch == 8 && !inputPwd.empty()) { inputPwd.pop_back(); cout << "\b \b"; }
+            else if( ch == 8 && inputPwd.empty()){}
+            else { inputPwd.push_back(ch); cout << "*"; }
+        }
+        cout << "\n";
+        ifstream inFile("accounts.txt");
+        string fileAcc, fileUser, filePass;
+        float fileBalance;
+        bool found = false;
+        while (inFile >> fileAcc >> fileUser >> filePass >> fileBalance) {
+            if (fileAcc == inputAcc && filePass == encryptPassword(inputPwd)) {
+                accNumber = fileAcc;
+                username = fileUser;
+                encPassword = filePass;
+                balance = fileBalance;
+                found = true;
+                break;
+            }
+        }
+        inFile.close();
+        // Exceptional handling using try and catch()
+        try {
+            if (!found) {
+                throw runtime_error("Invalid credentials!");
+            }
+            setColor(10);
+            cout << "\nLogin successful!\n";
+            setColor(7);
+            sleep_ms(1000);
+            return true;
+        }
+        catch (const runtime_error& e) {
+            setColor(12);
+            cout << "\nERROR: " << e.what() << "\n";
+            setColor(7);
+            sleep_ms(2000);
+            return false;
+        }        
+        
+    }
+    virtual void deposit(float amt) {
+        balance += amt;
+        setColor(10);
+        cout << "\nDeposit successful. Updated balance: Rs. ";
+        setColor(7);
+        cout << fixed << setprecision(2) << balance << "\n";
+        save();
+        logTransaction("Deposit", amt);
+        sleep_ms(3000);
+    }
+    virtual void withdraw(float amt) {
+        try {
+            if (amt > balance) {
+                throw runtime_error("Insufficient funds!");
+            }
+            balance -= amt;
+            setColor(10);
+            cout << "\nWithdrawal successful. Updated balance: Rs. ";
+            setColor(7);
+            cout << fixed << setprecision(2) << balance << "\n";
+            save();
+            logTransaction("Withdraw", amt);
+            sleep_ms(2000);
+    
+        } catch (const exception& e) {
+            setColor(12);
+            cout << "\nERROR: " << e.what() << "\n";
+            setColor(7);
+            sleep_ms(1000);
+        }
+    }    
+    virtual void transactionHistory() {
+        clearScreen();
+        ifstream histFile(accNumber + "_history.txt");
+        if (!histFile.is_open()) {
+            setColor(12);
+            cout << "\nNo transaction history found.\n";
+            setColor(7);
+            sleep_ms(2000);
+            return;
+        }
+        printLine('-');
+        setColor(14);
+        cout << "\t--- Transaction History for ";
+        setColor(12);
+        cout << username ;
+        setColor(14);
+        cout << " ---\n";
+        setColor(7);
+        printLine('-');
+        string line;
+        while (getline(histFile, line)) cout << line << "\n";
+        printLine('-');
+        histFile.close();
+        cout << "\nPress any key to return...";
+        _getch();
+    }
+    virtual void save() {
+        // files to save the logs 
+        ifstream inFile("accounts.txt");
+        ofstream tempFile("temp.txt");
+        string fileAcc, fileUser, filePass;
+        float fileBalance;
+        while (inFile >> fileAcc >> fileUser >> filePass >> fileBalance) {
+            if (fileAcc == accNumber) {
+                tempFile << accNumber << " " << username << " " << encPassword << " " << balance << "\n";
+            } else {
+                tempFile << fileAcc << " " << fileUser << " " << filePass << " " << fileBalance << "\n";
+            }
+        }
+        inFile.close();
+        tempFile.close();
+        remove("accounts.txt");
+        rename("temp.txt", "accounts.txt");
+    }
+    virtual void logTransaction(string type, float amt) {
+        ofstream histFile(accNumber + "_history.txt", ios::app);
+        if (histFile.is_open()) {
+            histFile << type << " Rs. " << fixed << setprecision(2) << amt << " | Balance: Rs. " << balance << "\n";
+            histFile.close();
+        }
+    }
+    // friend function and operator overloading
+    friend ostream& operator<<(ostream &out, const Account &acc);
+};
+ostream& operator<<(ostream &out, const Account &acc) {
+    out << "Account Number: " << acc.accNumber << "\n";
+    out << "Username: " << acc.username << "\n";
+    out << "Balance: Rs. " << fixed << setprecision(2) << acc.balance << "\n";
+    return out;
+}
+
+class GiftCard : public Account {
+protected:
+    string cardID;
+public:
+    GiftCard() : Account() {}
+    virtual void createGiftCard() {
+        srand(static_cast<unsigned>(time(0)));
+        int randomNum = rand() % 10000;
+        cardID = "GFT" + to_string(randomNum) + "_" + username;
+        setColor(11);
+        cout << "\nGift Card Created! Your Gift Card ID is: " << cardID << "\n";
+        setColor(7);
+        logTransaction("GiftCard Creation", 0);
+        sleep_ms(3000);
+    }
+    virtual void topUp(float amount) {
+        if (amount <= 0) {
+            setColor(12);
+            cout << "\nInvalid top-up amount!\n";
+            setColor(7);
+            sleep_ms(1000);
+            return;
+        }
+        deposit(amount);
+        logTransaction("GiftCard TopUp", amount);
+    }
+    virtual void displayDetails() {
+        cout << "\n----- Account Details -----\n";
+        cout << *this;
+        if (!cardID.empty()) cout << "Gift Card ID: " << cardID << "\n";
+        printLine('-');
+    }
+};
+
+class RedeemPoints : public GiftCard {
+protected:
+    int points;
+public:
+    RedeemPoints() : GiftCard(), points(0) {}
+    void earnPoints(float amount) {
+        int earned = static_cast<int>(amount / 10);
+        points += earned;
+        setColor(10);
+        cout << "\n" << earned << " reward points earned!\n";
+        setColor(7);
+        logTransaction("EarnPoints", static_cast<float>(earned));
+        sleep_ms(1000);
+    }
+    void redeem(float purchaseAmount) {
+        if (purchaseAmount > balance) {
+            setColor(12);
+            cout << "\nNot enough balance for redeem operation!\n";
+            setColor(7);
+            sleep_ms(1000);
+            return;
+        }
+        withdraw(purchaseAmount);
+        earnPoints(purchaseAmount);
+        setColor(10);
+        cout << "\nRedeem operation completed for purchase amount: Rs. " << fixed << setprecision(2) << purchaseAmount << "\n";
+        setColor(7);
+        sleep_ms(1000);
+    }
+    void redeem(int pts) {
+        if (pts > points) {
+            setColor(12);
+            cout << "\nNot enough reward points!\n";
+            setColor(7);
+            sleep_ms(1000);
+            return;
+        }
+        float discount = pts * 0.5f;
+        points -= pts;
+        balance += discount;
+        setColor(10);
+        cout << "\nRedeemed " << pts << " points for a discount of Rs. " << fixed << setprecision(2) << discount << "\n";
+        setColor(7);
+        logTransaction("RedeemPoints", discount);
+        sleep_ms(2000);
+    }
+    void showPoints() {
+        setColor(11);
+        cout << "\nYou currently have " << points << " reward points.\n";
+        setColor(7);
+        sleep_ms(2000);
+    }
+    virtual void displayDetails(){
+        cout << "\n----- Detailed Account Information -----\n";
+        cout << *this;
+        if (!cardID.empty()) cout << "Gift Card ID: " << cardID << "\n";
+        cout << "Reward Points: " << points << "\n";
+        printLine('-');
+    }
+    // friend function and operator overloading to display reedeem details
+    friend ostream& operator<<(ostream &out, const RedeemPoints &rp);
+};
+ostream& operator<<(ostream &out, const RedeemPoints &rp) {
+    out << "Account Number: " << rp.accNumber << "\n";
+    out << "Username: " << rp.username << "\n";
+    out << "Balance: Rs. " << fixed << setprecision(2) << rp.balance << "\n";
+    if (!rp.cardID.empty()) out << "Gift Card ID: " << rp.cardID << "\n";
+    out << "Reward Points: " << rp.points << "\n";
+    return out;
+}
+
+class Notifier {
+public:
+    void notify(string message, int color = 7) {
+        setColor(color);
+        cout << message << "\n";
+        setColor(7);
+        sleep_ms(500);
+    }
+};
+
+class AdvancedAccount : public Account, public Notifier {
+public:
+    AdvancedAccount() : Account() {}
+    virtual void deposit(float amt) override {
+        Notifier::notify("AdvancedAccount: Initiating deposit...", 14);
+        Account::deposit(amt);
+    }
+};
+
+class DepositOperation : public Operation {
+    Account* acc;
+    float amount;
+public:
+    DepositOperation(Account* a, float amt) : acc(a), amount(amt) {}
+    void perform() override { acc->deposit(amount); }
+};
+
+class WithdrawOperation : public Operation {
+    Account* acc;
+    float amount;
+public:
+    WithdrawOperation(Account* a, float amt) : acc(a), amount(amt) {}
+    void perform() override { acc->withdraw(amount); }
+};
+
+class RedeemOperation : public Operation {
+    RedeemPoints* rp;
+    float purchaseAmount;
+public:
+    RedeemOperation(RedeemPoints* account, float amt) : rp(account), purchaseAmount(amt) {}
+    void perform() override { rp->redeem(purchaseAmount); }
+};
+
+void displaySplashScreen() {
+    clearScreen();
+    setColor(11);
+    printLine('=');
+    cout << "  Welcome to University Bank Management System\n";
+    printLine('=');
+    cout << endl;
+    sleep_ms(1000);
+    setColor(10);
+    loadingAnimation("Loading System", 6);
+}
+
+void displayMainMenu() {
+    clearScreen();
+    setColor(7);
+    printLine('=');
+    setColor(14);
+    cout << "     Welcome to Bank Management System\n";
+    setColor(7);
+    printLine('=');
+    cout << "1. Create Account\n";
+    cout << "2. Login\n";
+    cout << "3. Exit\n";
+    printLine('=');
+    cout << "Enter your choice: ";
+}
+
+void displayUserMenu() {
+    clearScreen();
+    printLine('=');
+    setColor(13);
+    cout << "\t--- Account Operations ---\n";
+    setColor(7);
+    printLine('=');
+    cout << "1. Deposit Money\n";
+    cout << "2. Withdraw Money\n";
+    cout << "3. Display Account Details\n";
+    cout << "4. Transaction History\n";
+    cout << "5. Create Gift Card\n";
+    cout << "6. TopUp Gift Card\n";
+    cout << "7. Redeem Purchase (Amount)\n";
+    cout << "8. Redeem Points\n";
+    cout << "9. Show Reward Points\n";
+    cout << "10. Logout\n";
+    printLine('=');
+    cout << "Enter your option: ";
+}
+int main() {
+    int choice;
+    RedeemPoints user;
+    bool loggedIn = false;
+    displaySplashScreen();
+    while (true) {
+        displayMainMenu();
+        choice = getIntegerInput();
+        if (choice == 1) {
+            user.createAccount();
+        }
+        else if (choice == 2) {
+            if (user.login()) {
+                loggedIn = true;
+                int option;
+                while (loggedIn) {
+                    displayUserMenu();
+                    option = getIntegerInput();
+                    switch (option) {
+                        case 1: {
+                            float amt;
+                            cout << "\nEnter amount to deposit (Rs.): ";
+                            amt = getFloatInput();
+                            DepositOperation depOp(&user, amt);
+                            depOp.perform();
+                            break;
+                        }
+                        case 2: {
+                            float amt;
+                            cout << "\nEnter amount to withdraw (Rs.): ";
+                            amt = getFloatInput();
+                            WithdrawOperation witOp(&user, amt);
+                            witOp.perform();
+                            break;
+                        }
+                        case 3: {
+                            clearScreen();
+                            user.displayDetails();
+                            cout << "\nPress any key to return to the menu...";
+                            _getch();
+                            break;
+                        }
+                        case 4: {
+                            user.transactionHistory();
+                            break;
+                        }
+                        case 5: {
+                            user.createGiftCard();
+                            break;
+                        }
+                        case 6: {
+                            float amt;
+                            cout << "\nEnter top-up amount for Gift Card (Rs.): ";
+                            amt = getFloatInput();
+                            user.topUp(amt);
+                            break;
+                        }
+                        case 7: {
+                            float amt;
+                            cout << "\nEnter purchase amount for redeem operation (Rs.): ";
+                            amt = getFloatInput();
+                            RedeemOperation redOp(&user, amt);
+                            redOp.perform();
+                            break;
+                        }
+                        case 8: {
+                            int pts;
+                            cout << "\nEnter number of reward points to redeem: ";
+                            pts = getIntegerInput();
+                            user.redeem(pts);
+                            break;
+                        }
+                        case 9: {
+                            user.showPoints();
+                            break;
+                        }
+                        case 10: {
+                            setColor(14);
+                            cout << "\nLogging out...\n";
+                            setColor(7);
+                            sleep_ms(1000);
+                            loggedIn = false;
+                            break;
+                        }
+                        default: {
+                            setColor(12);
+                            cout << "\nInvalid option! Please try again.\n";
+                            setColor(7);
+                            sleep_ms(1000);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else if (choice == 3) {
+            string mmm = "Thank you for using the Bank Management System. See you next time!\n";
+            setColor(12);
+            for(int i=0; i<47; i++){
+                cout<< mmm[i];
+                sleep_ms(50);
+            }setColor(14);
+            for(int i=47; i<mmm.length(); i++){
+                cout << mmm[i];
+                sleep_ms(50);
+            }
+            setColor(7);
+            break;
+        }
+        else {
+            setColor(12);
+            cout << "\nInvalid main menu option! Please try again.\n";
+            setColor(7);
+            sleep_ms(1000);
+        }
+    }
+    return 0;
+}
